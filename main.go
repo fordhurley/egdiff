@@ -55,7 +55,7 @@ const (
 )
 
 var runRE = regexp.MustCompile(`^=== RUN\b`)
-var failRE = regexp.MustCompile(`^--- FAIL: Example.+\)$`)
+var failRE = regexp.MustCompile(`^--- FAIL: (Example\S*)\b.*\)$`)
 var gotRE = regexp.MustCompile(`^got:$`)
 var wantRE = regexp.MustCompile(`^want:$`)
 
@@ -64,12 +64,16 @@ func (s *Scanner) Next() (Example, error) {
 	var got bytes.Buffer
 	var want bytes.Buffer
 
+	eg := Example{}
+
 	for s.scanner.Scan() {
 		line := s.scanner.Text()
 
 		switch s.state {
 		case outside:
-			if failRE.MatchString(line) {
+			matches := failRE.FindStringSubmatch(line)
+			if matches != nil {
+				eg.Name = matches[1]
 				s.state = inside
 			}
 		case inside:
@@ -77,7 +81,7 @@ func (s *Scanner) Next() (Example, error) {
 				s.state = insideGot
 			} else {
 				// The very next line _has_ to be "got:", or something must be wrong...
-				return Example{}, fmt.Errorf("line should be got!!!!\n%s", line)
+				return eg, fmt.Errorf("line should be got!!!!\n%s", line)
 			}
 		case insideGot:
 			if wantRE.MatchString(line) {
@@ -89,11 +93,9 @@ func (s *Scanner) Next() (Example, error) {
 			// NOTE: This requires `go test -v`, so that it's printed out before each test:
 			if runRE.MatchString(line) || line == "FAIL" {
 				s.state = outside
-				return Example{
-					// TODO: Name
-					Got:  got.String(),
-					Want: want.String(),
-				}, nil
+				eg.Got = got.String()
+				eg.Want = want.String()
+				return eg, nil
 			}
 			fmt.Fprintln(&want, line)
 		}
@@ -101,18 +103,16 @@ func (s *Scanner) Next() (Example, error) {
 
 	err := s.scanner.Err()
 	if err != nil {
-		return Example{}, err
+		return eg, err
 	}
 
 	if got.Len() > 0 || want.Len() > 0 {
-		return Example{
-			// TODO: Name
-			Got:  got.String(),
-			Want: want.String(),
-		}, nil
+		eg.Got = got.String()
+		eg.Want = want.String()
+		return eg, nil
 	}
 
-	return Example{}, EOF
+	return eg, EOF
 }
 
 var EOF = errors.New("EOF")
