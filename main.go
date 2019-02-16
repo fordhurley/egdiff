@@ -3,16 +3,47 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"regexp"
 )
 
-var runRE = regexp.MustCompile(`^=== RUN\b`)
-var failRE = regexp.MustCompile(`^--- FAIL: Example.+\)$`)
-var gotRE = regexp.MustCompile(`^got:$`)
-var wantRE = regexp.MustCompile(`^want:$`)
+func main() {
+	log.SetFlags(log.Lshortfile | log.Ltime)
+	s := NewScanner(os.Stdin)
+
+	for {
+		eg, err := s.Next()
+		if err == nil {
+			fmt.Println(eg)
+			continue
+		}
+		if err == EOF {
+			return
+		}
+		log.Fatal(err)
+	}
+}
+
+type Example struct {
+	Name string
+	Got  string
+	Want string
+}
+
+type Scanner struct {
+	scanner *bufio.Scanner
+	state   state
+}
+
+func NewScanner(r io.Reader) *Scanner {
+	return &Scanner{
+		scanner: bufio.NewScanner(r),
+	}
+}
 
 type state int
 
@@ -23,62 +54,73 @@ const (
 	insideWant
 )
 
-func main() {
-	state := outside
+var runRE = regexp.MustCompile(`^=== RUN\b`)
+var failRE = regexp.MustCompile(`^--- FAIL: Example.+\)$`)
+var gotRE = regexp.MustCompile(`^got:$`)
+var wantRE = regexp.MustCompile(`^want:$`)
 
+// Next returns the next
+func (s *Scanner) Next() (Example, error) {
 	var got bytes.Buffer
 	var want bytes.Buffer
 
-	reset := func() {
-		if got.Len() > 0 || want.Len() > 0 {
-			fmt.Println("CAPTURED GOT INPUT:")
-			fmt.Println(got.String())
-			fmt.Println()
-			fmt.Println("CAPTURED WANT INPUT:")
-			fmt.Println(want.String())
-			fmt.Println()
-		}
-		got.Reset()
-		want.Reset()
-	}
+	for s.scanner.Scan() {
+		line := s.scanner.Text()
 
-	scanner := bufio.NewScanner(os.Stdin)
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		switch state {
+		switch s.state {
 		case outside:
 			if failRE.MatchString(line) {
-				reset()
-				state = inside
+				s.state = inside
 			}
 		case inside:
 			if gotRE.MatchString(line) {
-				state = insideGot
+				s.state = insideGot
 			} else {
 				// The very next line _has_ to be "got:", or something must be wrong...
-				log.Fatalf("line should be got!!!!\n%s", line)
+				return Example{}, fmt.Errorf("line should be got!!!!\n%s", line)
 			}
 		case insideGot:
 			if wantRE.MatchString(line) {
-				state = insideWant
+				s.state = insideWant
 				continue
 			}
 			fmt.Fprintln(&got, line)
 		case insideWant:
 			// NOTE: This requires `go test -v`, so that it's printed out before each test:
-			if runRE.MatchString(line) {
-				state = outside
-				continue
+			if runRE.MatchString(line) || line == "FAIL" {
+				s.state = outside
+				return Example{
+					// TODO: Name
+					Got:  got.String(),
+					Want: want.String(),
+				}, nil
 			}
 			fmt.Fprintln(&want, line)
 		}
 	}
-	err := scanner.Err()
+
+	err := s.scanner.Err()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "reading standard input:", err)
-		os.Exit(1)
+		return Example{}, err
 	}
 
-	reset()
+	if got.Len() > 0 || want.Len() > 0 {
+		return Example{
+			// TODO: Name
+			Got:  got.String(),
+			Want: want.String(),
+		}, nil
+	}
+
+	return Example{}, EOF
+}
+
+var EOF = errors.New("EOF")
+
+func (e Example) String() string {
+	return fmt.Sprintf(`Example{
+	Name: %q,
+	Got: %q,
+	Want: %q,
+}`, e.Name, e.Got, e.Want)
 }
