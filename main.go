@@ -6,25 +6,23 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"regexp"
 )
 
 func main() {
-	log.SetFlags(log.Lshortfile | log.Ltime)
 	s := NewScanner(os.Stdin)
 
 	for {
-		eg, err := s.Next()
-		if err == nil {
-			fmt.Println(eg)
-			continue
-		}
+		eg, err := s.NextExample()
 		if err == EOF {
 			return
 		}
-		log.Fatal(err)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		fmt.Println(eg)
 	}
 }
 
@@ -59,8 +57,8 @@ var failRE = regexp.MustCompile(`^--- FAIL: (Example\S*)\b.*\)$`)
 var gotRE = regexp.MustCompile(`^got:$`)
 var wantRE = regexp.MustCompile(`^want:$`)
 
-// Next returns the next
-func (s *Scanner) Next() (Example, error) {
+// NextExample returns the output from the next example.
+func (s *Scanner) NextExample() (Example, error) {
 	var got bytes.Buffer
 	var want bytes.Buffer
 
