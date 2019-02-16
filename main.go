@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -59,8 +58,7 @@ var wantRE = regexp.MustCompile(`^want:$`)
 
 // NextExample returns the output from the next example.
 func (s *Scanner) NextExample() (Example, error) {
-	var got bytes.Buffer
-	var want bytes.Buffer
+	s.state = outside
 
 	eg := Example{}
 
@@ -86,16 +84,13 @@ func (s *Scanner) NextExample() (Example, error) {
 				s.state = insideWant
 				continue
 			}
-			fmt.Fprintln(&got, line)
+			eg.Got += line + "\n"
 		case insideWant:
 			// NOTE: This requires `go test -v`, so that it's printed out before each test:
 			if runRE.MatchString(line) || line == "FAIL" {
-				s.state = outside
-				eg.Got = got.String()
-				eg.Want = want.String()
 				return eg, nil
 			}
-			fmt.Fprintln(&want, line)
+			eg.Want += line + "\n"
 		}
 	}
 
@@ -104,9 +99,7 @@ func (s *Scanner) NextExample() (Example, error) {
 		return eg, err
 	}
 
-	if got.Len() > 0 || want.Len() > 0 {
-		eg.Got = got.String()
-		eg.Want = want.String()
+	if len(eg.Got) > 0 || len(eg.Want) > 0 {
 		return eg, nil
 	}
 
