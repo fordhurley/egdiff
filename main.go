@@ -20,7 +20,10 @@ func main() {
 	s.Split(ScanTestOutputs)
 
 	for s.Scan() {
-		fmt.Printf("\033[1;91m%v\033[0m\n", s.Text())
+		eg, ok := parseFailingExample(s.Text())
+		if ok {
+			fmt.Printf("\033[1;91m%v\033[0m\n", eg)
+		}
 	}
 	err := s.Err()
 	if err != nil {
@@ -28,7 +31,10 @@ func main() {
 	}
 }
 
-var runHeaderRE = regexp.MustCompile(`(?m)^=== RUN\b.*$`)
+var (
+	runHeaderRE         = regexp.MustCompile(`(?m)^=== RUN\b.*$`)
+	failExampleHeaderRE = regexp.MustCompile(`^--- FAIL: (Example\S*)\s+\(.+\)`)
+)
 
 // ScanTestOutputs is a split function for a bufio.Scanner that returns the
 // output related to a single test
@@ -85,4 +91,14 @@ func (e Example) String() string {
 	Got: %q,
 	Want: %q,
 }`, e.Name, e.Got, e.Want)
+}
+
+func parseFailingExample(s string) (Example, bool) {
+	matches := failExampleHeaderRE.FindAllStringSubmatch(s, 1)
+	if len(matches) != 1 {
+		return Example{}, false
+	}
+	return Example{
+		Name: matches[0][1],
+	}, true
 }

@@ -48,13 +48,11 @@ func Example_runHeaderRE() {
 	if matches == nil {
 		panic("no matches")
 	}
-	fmt.Printf("%d matches:\n", len(matches))
 	for _, m := range matches {
 		fmt.Println(m)
 	}
 
 	// Output:
-	// 4 matches:
 	// === RUN   Test_sayHi
 	// === RUN   Example_sayHi
 	// === RUN   Example_replaceLineEndings
@@ -117,4 +115,22 @@ oh no
 			t.Errorf("expected:\n%q\ngot:\n%q", expectedOutput, output)
 		}
 	}
+}
+
+func Example_parseFailingExample() {
+	eg, ok := parseFailingExample(`--- FAIL: ExampleFoo (0.00s)
+got:
+foo
+want:
+bar
+`)
+	fmt.Println(eg.Name, ok)
+
+	eg, ok = parseFailingExample(`--- PASS: ExampleBar (0.00s)
+`)
+	fmt.Println(eg.Name, ok)
+
+	// Output:
+	// ExampleFoo true
+	//  false
 }
