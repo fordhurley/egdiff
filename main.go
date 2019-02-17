@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"regexp"
@@ -14,18 +13,15 @@ import (
 )
 
 func main() {
-	// Pipe Stdin through to Stdout, but tap into the stream for our parser:
-	in := io.TeeReader(os.Stdin, os.Stdout)
-	// TODO: buffer Stdin so that we can put our fancy formatted diff output
-	// right after the real test output.
-
-	s := bufio.NewScanner(in)
+	s := bufio.NewScanner(os.Stdin)
 	s.Split(ScanTestOutputs)
 
 	for s.Scan() {
-		eg, ok := parseFailingExample(s.Text())
+		output := s.Text()
+		eg, ok := parseFailingExample(output)
+		fmt.Print(output)
 		if ok {
-			fmt.Printf("\033[1;91m%v\033[0m\n", eg.Diff())
+			fmt.Printf("\033[1;91m%v\033[0m", eg.Diff())
 		}
 	}
 	err := s.Err()
@@ -47,11 +43,15 @@ func ScanTestOutputs(data []byte, atEOF bool) (advance int, token []byte, err er
 	}
 	matches := runHeaderRE.FindAllIndex(data, 2)
 	if len(matches) == 0 {
+		if atEOF {
+			// This must just be the run summary, so return it:
+			return len(data), data, nil
+		}
 		// Ask for more data:
 		return 0, nil, nil
 	}
 	headerLoc := matches[0]
-	start := headerLoc[1] + 1 // one after the end of the header
+	start := headerLoc[0] // including the header
 	if len(matches) == 2 {
 		// Found a header before and a header after, so return everything in
 		// between:
@@ -90,6 +90,14 @@ type Example struct {
 }
 
 func parseFailingExample(s string) (Example, bool) {
+	// Trim RUN header:
+	splits := strings.SplitAfterN(s, "\n", 2)
+	if len(splits) != 2 {
+		return Example{}, false
+	}
+	s = splits[1]
+
+	// Extract name from FAIL header:
 	matches := failExampleHeaderRE.FindAllStringSubmatch(s, 1)
 	if len(matches) != 1 {
 		return Example{}, false
@@ -98,16 +106,16 @@ func parseFailingExample(s string) (Example, bool) {
 		Name: matches[0][1],
 	}
 
-	splits := strings.SplitAfterN(s, "\ngot:\n", 2)
+	// Grab everything after the "got:" line:
+	splits = strings.SplitAfterN(s, "\ngot:\n", 2)
 	if len(splits) != 2 {
-		log.Printf("got: %#v", splits)
 		return Example{}, false
 	}
 	s = splits[1]
 
+	// Split on the "want:" line:
 	splits = strings.SplitN(s, "\nwant:\n", 2)
 	if len(splits) != 2 {
-		log.Printf("want: %#v", splits)
 		return Example{}, false
 	}
 	eg.Got = splits[0]

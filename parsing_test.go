@@ -50,9 +50,10 @@ FAIL	_/Users/ford/src/github.com/fordhurley/egdiff/testdata	0.005s
 `
 
 var expectedOutputs = []string{
-	"--- PASS: Test_sayHi (0.00s)\n",
-	"--- PASS: Example_sayHi (0.00s)\n",
-	`--- FAIL: Example_replaceLineEndings (0.00s)
+	"=== RUN   Test_sayHi\n--- PASS: Test_sayHi (0.00s)\n",
+	"=== RUN   Example_sayHi\n--- PASS: Example_sayHi (0.00s)\n",
+	`=== RUN   Example_replaceLineEndings
+--- FAIL: Example_replaceLineEndings (0.00s)
 got:
 "a\n\nb\n\nc"
 "a\nb\nc"
@@ -64,13 +65,15 @@ want:
 "a\nb\nc"
 "abc"
 `,
-	`--- FAIL: Example_simple (0.00s)
+	`=== RUN   Example_simple
+--- FAIL: Example_simple (0.00s)
 got:
 this is not it
 want:
 this is it
 `,
-	`--- FAIL: Example_tricky (0.00s)
+	`=== RUN   Example_tricky
+--- FAIL: Example_tricky (0.00s)
 got:
 this is the output
 with tricky stuff mixed in
@@ -85,6 +88,9 @@ got:
 (tricked you?)
 want:
 oh no
+`,
+	`FAIL
+FAIL	_/Users/ford/src/github.com/fordhurley/egdiff/testdata	0.005s
 `,
 }
 
@@ -154,7 +160,7 @@ func TestScanTestOutputs(t *testing.T) {
 	}
 
 	if len(outputs) != len(expectedOutputs) {
-		t.Errorf("expected %d outputs, got %d", len(expectedOutputs), len(outputs))
+		t.Fatalf("expected %d outputs, got %d", len(expectedOutputs), len(outputs))
 	}
 
 	for i, output := range outputs {
@@ -166,7 +172,8 @@ func TestScanTestOutputs(t *testing.T) {
 }
 
 func Example_parseFailingExample() {
-	eg, ok := parseFailingExample(`--- FAIL: ExampleFoo (0.00s)
+	eg, ok := parseFailingExample(`=== RUN   ExampleFoo
+--- FAIL: ExampleFoo (0.00s)
 got:
 foo
 want:
@@ -174,7 +181,8 @@ bar
 `)
 	fmt.Println(eg.Name, ok)
 
-	eg, ok = parseFailingExample(`--- PASS: ExampleBar (0.00s)
+	eg, ok = parseFailingExample(`=== RUN   ExampleBar
+--- PASS: ExampleBar (0.00s)
 `)
 	fmt.Println(eg.Name, ok)
 
