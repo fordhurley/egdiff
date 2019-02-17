@@ -1,10 +1,11 @@
-Output a nice diff for failing golang examples.
+`egdiff` -- add formatted diffs for failing go examples
 
 
 Turn this:
 
 
-    $ go test ./...
+    $ go test -v ./...
+    === RUN   Example_replaceLineEndings
     --- FAIL: Example_replaceLineEndings (0.00s)
     got:
     "a\n\nb\n\nc"
@@ -20,7 +21,8 @@ Turn this:
 
 Into this:
 
-    $ go test ./... | egdiff
+    $ go test -v ./... | egdiff
+    === RUN   Example_replaceLineEndings
     --- FAIL: Example_replaceLineEndings (0.00s)
     got:
     "a\n\nb\n\nc"
@@ -32,29 +34,24 @@ Into this:
     "a\nb/nc"
     "a\nb\nc"
     "abc"
-    diff:
-    2c2
-    < "a\nb/nc"
-    ---
-    > "a\nb\nc"
+    --- Want
+    +++ Got
+    @@ -1,4 +1,4 @@
+    "a\n\nb\n\nc"
+    -"a\nb/nc"
+    +"a\nb\nc"
+    "a\nb\nc"
+    "abc"
     FAIL
 
-(or something even better)
+
+Install
+
+    go get -u github.com/fordhurley/egdiff
 
 
-The example formatting code is here: https://golang.org/src/testing/example.go
+Pipe *verbose* test output to it:
 
-Based on that, the line prefix `--- FAIL: Example` should be enough to identify
-the beginning of a failing test. This means the tool could probably work well as
-a simple pipeline:
+    go test -v . | egdiff
 
-    go test ./... | egdiff
-
-
-Slightly fancier would be to run the tool directly, like:
-
-    egdiff ./...
-
-And it would run only the examples and format the output. That seems
-diminishingly valuable, though. Formatting the output is the one thing this tool
-does.
+**TODO:** don't require verbose flag
