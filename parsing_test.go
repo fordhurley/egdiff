@@ -43,6 +43,69 @@ FAIL
 FAIL	_/Users/ford/src/github.com/fordhurley/egdiff/testdata	0.005s
 `
 
+var expectedOutputs = []string{
+	"--- PASS: Test_sayHi (0.00s)\n",
+	"--- PASS: Example_sayHi (0.00s)\n",
+	`--- FAIL: Example_replaceLineEndings (0.00s)
+got:
+"a\n\nb\n\nc"
+"a\nb\nc"
+"a\nb\nc"
+"abc"
+want:
+"a\n\nb\n\nc"
+"a\nb/nc"
+"a\nb\nc"
+"abc"
+`,
+	`--- FAIL: Example_meta (0.00s)
+got:
+this is the output
+with tricky stuff mixed in
+got:
+(tricked you?)
+want:
+oh no
+want:
+this is the output
+with tricky stuf mixed in
+got:
+(tricked you?)
+want:
+oh no
+`,
+}
+
+var expectedExamples = []Example{
+	{
+		Name: "Example_replaceLineEndings",
+		Got: `"a\n\nb\n\nc"
+"a\nb\nc"
+"a\nb\nc"
+"abc"`,
+		Want: `"a\n\nb\n\nc"
+"a\nb/nc"
+"a\nb\nc"
+"abc"`,
+	},
+	{
+		Name: "Example_meta",
+		Got: `
+this is the output
+with tricky stuff mixed in
+got:
+(tricked you?)
+want:
+oh no`,
+		Want: `this is the output
+with tricky stuf mixed in
+got:
+(tricked you?)
+want:
+oh no`,
+	},
+}
+
 func Example_runHeaderRE() {
 	matches := runHeaderRE.FindAllString(verboseTestOutput, -1)
 	if matches == nil {
@@ -70,39 +133,6 @@ func TestScanTestOutputs(t *testing.T) {
 	err := s.Err()
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	expectedOutputs := []string{
-		"--- PASS: Test_sayHi (0.00s)\n",
-		"--- PASS: Example_sayHi (0.00s)\n",
-		`--- FAIL: Example_replaceLineEndings (0.00s)
-got:
-"a\n\nb\n\nc"
-"a\nb\nc"
-"a\nb\nc"
-"abc"
-want:
-"a\n\nb\n\nc"
-"a\nb/nc"
-"a\nb\nc"
-"abc"
-`,
-		`--- FAIL: Example_meta (0.00s)
-got:
-this is the output
-with tricky stuff mixed in
-got:
-(tricked you?)
-want:
-oh no
-want:
-this is the output
-with tricky stuf mixed in
-got:
-(tricked you?)
-want:
-oh no
-`,
 	}
 
 	if len(outputs) != len(expectedOutputs) {
@@ -133,4 +163,26 @@ bar
 	// Output:
 	// ExampleFoo true
 	//  false
+}
+
+func TestParseFailingExample(t *testing.T) {
+	var examples []Example
+	for _, output := range expectedOutputs {
+		eg, ok := parseFailingExample(output)
+		if ok {
+			examples = append(examples, eg)
+		}
+	}
+
+	if len(examples) != len(expectedExamples) {
+		t.Errorf("expected %d examples, got %d", len(expectedExamples), len(examples))
+	}
+
+	for i, example := range examples {
+		expectedExample := expectedExamples[i]
+		if example.Name != expectedExample.Name {
+			t.Errorf("expected:\n%q\ngot:\n%q", expectedExample.Name, example.Name)
+		}
+		// TODO: check Got and Want
+	}
 }

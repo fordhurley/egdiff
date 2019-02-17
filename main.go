@@ -62,6 +62,7 @@ func ScanTestOutputs(data []byte, atEOF bool) (advance int, token []byte, err er
 		advance, token := trimLastNLines(data[start:], 2)
 		return advance, token, nil
 	}
+	// Ask for more data:
 	return 0, nil, nil
 }
 
