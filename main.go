@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"regexp"
+	"strings"
 )
 
 func main() {
@@ -99,7 +100,24 @@ func parseFailingExample(s string) (Example, bool) {
 	if len(matches) != 1 {
 		return Example{}, false
 	}
-	return Example{
+	eg := Example{
 		Name: matches[0][1],
-	}, true
+	}
+
+	splits := strings.SplitAfterN(s, "\ngot:\n", 2)
+	if len(splits) != 2 {
+		log.Printf("got: %#v", splits)
+		return Example{}, false
+	}
+	s = splits[1]
+
+	splits = strings.SplitN(s, "\nwant:\n", 2)
+	if len(splits) != 2 {
+		log.Printf("want: %#v", splits)
+		return Example{}, false
+	}
+	eg.Got = splits[0]
+	eg.Want = strings.TrimSuffix(splits[1], "\n")
+
+	return eg, true
 }
