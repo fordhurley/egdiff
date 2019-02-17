@@ -16,6 +16,8 @@ func main() {
 	s := bufio.NewScanner(os.Stdin)
 	s.Split(ScanTestOutputs)
 
+	lastChunk := ""
+
 	for s.Scan() {
 		output := s.Text()
 		eg, ok := parseFailingExample(output)
@@ -23,10 +25,15 @@ func main() {
 		if ok {
 			fmt.Printf("\033[1;91m%v\033[0m", eg.Diff())
 		}
+		lastChunk = output
 	}
 	err := s.Err()
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	if strings.HasPrefix(lastChunk, "FAIL") {
+		os.Exit(1)
 	}
 }
 
