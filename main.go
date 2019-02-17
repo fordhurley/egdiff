@@ -48,48 +48,64 @@ func ScanTestOutputs(data []byte, atEOF bool) (advance int, token []byte, err er
 	if atEOF && len(data) == 0 {
 		return 0, nil, nil
 	}
+
 	matches := runHeaderRE.FindAllIndex(data, 2)
 	if len(matches) == 0 {
 		if atEOF {
-			// This must just be the run summary, so return it:
+			// Return whatever we got:
 			return len(data), data, nil
 		}
 		// Ask for more data:
 		return 0, nil, nil
 	}
+
 	headerLoc := matches[0]
 	start := headerLoc[0] // including the header
+
 	if len(matches) == 2 {
-		// Found a header before and a header after, so return everything in
-		// between:
-		end := matches[1][0] // start of the next header (we'll capture the trailing newline)
-		between := data[start:end]
-		return end, between, nil
+		// Found a header before and a header after, so return everything up to
+		// the next header:
+		nextHeaderLoc := matches[1]
+		end := nextHeaderLoc[0] // start of the next header (we'll capture the trailing newline)
+		return end, data[start:end], nil
 	}
+
 	if len(matches) == 1 && atEOF {
 		// Return everything after the header, but throw out the last two lines
 		// of output because they show the status:
-		advance, token := trimLastNLines(data[start:], 2)
-		return advance, token, nil
+		index := NthFromLastIndex(data[start:], []byte("\n"), 2)
+		// Include that last newline:
+		index++
+		return index, data[start:index], nil
 	}
+
 	// Ask for more data:
 	return 0, nil, nil
 }
 
-func trimLastNLines(data []byte, n int) (advance int, token []byte) {
-	advance = len(data)
-	for i := 0; advance > 0 && i < n; i++ {
-		lastIndex := bytes.LastIndex(data[0:advance-1], []byte("\n"))
+// NthFromLastIndex is like bytes.LastIndex, but can skip back N from the end.
+// Counting start from 0, so:
+//
+//    NthFromLastIndex(data, sep, 0) == bytes.LastIndex(data, sep)
+//
+func NthFromLastIndex(data []byte, sep []byte, n int) int {
+	index := bytes.LastIndex(data, sep)
+	if index < 0 {
+		return index
+	}
+
+	for i := 0; index > 0 && i < n; i++ {
+		lastIndex := bytes.LastIndex(data[0:index], sep)
 		if lastIndex < 0 {
-			advance = 0
+			index = 0
 			break
 		}
-		advance = lastIndex + 1
+		index = lastIndex
 	}
-	return advance, data[:advance]
+	return index
 }
 
-// Example is the parsed the output of a failing example.
+// Example is the parsed output of a failing example.
 type Example struct {
 	Name string
 	Got  string
