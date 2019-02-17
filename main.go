@@ -17,12 +17,14 @@ func main() {
 	s.Split(ScanTestOutputs)
 
 	lastChunk := ""
+	foundExample := false
 
 	for s.Scan() {
 		output := s.Text()
 		eg, ok := parseFailingExample(output)
 		fmt.Print(output)
 		if ok {
+			foundExample = true
 			fmt.Printf("\033[1;91m%v\033[0m", eg.Diff())
 		}
 		lastChunk = output
@@ -32,7 +34,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if strings.HasPrefix(lastChunk, "FAIL") {
+	if !foundExample {
+		fmt.Fprintln(os.Stderr, "egdiff: no failing example found, did you pass `-v` to go test?")
+	}
+
+	lastNewline := NthFromLastIndex([]byte(lastChunk), []byte("\n"), 1)
+	if lastChunk[lastNewline+1:lastNewline+5] == "FAIL" {
 		os.Exit(1)
 	}
 }
