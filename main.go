@@ -9,6 +9,8 @@ import (
 	"os"
 	"regexp"
 	"strings"
+
+	"github.com/pmezard/go-difflib/difflib"
 )
 
 func main() {
@@ -23,7 +25,7 @@ func main() {
 	for s.Scan() {
 		eg, ok := parseFailingExample(s.Text())
 		if ok {
-			fmt.Printf("\033[1;91m%v\033[0m\n", eg)
+			fmt.Printf("\033[1;91m%v\033[0m\n", eg.Diff())
 		}
 	}
 	err := s.Err()
@@ -87,14 +89,6 @@ type Example struct {
 	Want string
 }
 
-func (e Example) String() string {
-	return fmt.Sprintf(`Example{
-	Name: %q,
-	Got: %q,
-	Want: %q,
-}`, e.Name, e.Got, e.Want)
-}
-
 func parseFailingExample(s string) (Example, bool) {
 	matches := failExampleHeaderRE.FindAllStringSubmatch(s, 1)
 	if len(matches) != 1 {
@@ -120,4 +114,16 @@ func parseFailingExample(s string) (Example, bool) {
 	eg.Want = strings.TrimSuffix(splits[1], "\n")
 
 	return eg, true
+}
+
+// Diff formats the difference between Want and Got.
+func (eg Example) Diff() string {
+	diff, _ := difflib.GetUnifiedDiffString(difflib.UnifiedDiff{
+		A:        difflib.SplitLines(eg.Want),
+		B:        difflib.SplitLines(eg.Got),
+		FromFile: "Want",
+		ToFile:   "Got",
+		Context:  2,
+	})
+	return diff
 }
