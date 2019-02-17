@@ -2,111 +2,67 @@ package main
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"regexp"
 )
 
 func main() {
-	s := NewScanner(os.Stdin)
+	// Pipe Stdin through to Stdout, but tap into the stream for our parser:
+	in := io.TeeReader(os.Stdin, os.Stdout)
+	// TODO: buffer Stdin so that we can put our fancy formatted diff output
+	// right after the real test output.
 
-	for {
-		eg, err := s.NextExample()
-		if err == EOF {
-			return
-		}
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
-		fmt.Println(eg)
+	s := bufio.NewScanner(in)
+	s.Split(ScanTestOutputs)
+
+	for s.Scan() {
+		fmt.Printf("\033[1;91m%v\033[0m\n", s.Text())
+	}
+	err := s.Err()
+	if err != nil {
+		log.Fatal(err)
 	}
 }
 
+var runHeaderRE = regexp.MustCompile(`(?m)^=== RUN\b.*$`)
+
+// ScanTestOutputs is a split function for a bufio.Scanner that returns the
+// output related to a single test
+func ScanTestOutputs(data []byte, atEOF bool) (advance int, token []byte, err error) {
+	if atEOF && len(data) == 0 {
+		return 0, nil, nil
+	}
+	matches := runHeaderRE.FindAllIndex(data, 2)
+	if len(matches) == 0 {
+		// Ask for more data:
+		return 0, nil, nil
+	}
+	headerLoc := matches[0]
+	start := headerLoc[1] + 1 // one after the end of the header
+	if len(matches) == 2 {
+		// Found a header before and a header after, so return everything in
+		// between:
+		end := matches[1][0] // start of the next header (we'll capture the trailing newline)
+		between := data[start:end]
+		return end, between, nil
+	}
+	if len(matches) == 1 && atEOF {
+		// Return everything after the header:
+		return len(data), data[start : len(data)-1], nil
+		// FIXME: Skip the last two lines of output, they show the status
+	}
+	return 0, nil, nil
+}
+
+// Example is the parsed the output of a failing example.
 type Example struct {
 	Name string
 	Got  string
 	Want string
 }
-
-type Scanner struct {
-	scanner *bufio.Scanner
-	state   state
-}
-
-func NewScanner(r io.Reader) *Scanner {
-	return &Scanner{
-		scanner: bufio.NewScanner(r),
-	}
-}
-
-type state int
-
-const (
-	outside state = iota
-	inside
-	insideGot
-	insideWant
-)
-
-var runRE = regexp.MustCompile(`^=== RUN\b`)
-var failRE = regexp.MustCompile(`^--- FAIL: (Example\S*)\b.*\)$`)
-var gotRE = regexp.MustCompile(`^got:$`)
-var wantRE = regexp.MustCompile(`^want:$`)
-
-// NextExample returns the output from the next example.
-func (s *Scanner) NextExample() (Example, error) {
-	s.state = outside
-
-	eg := Example{}
-
-	for s.scanner.Scan() {
-		line := s.scanner.Text()
-
-		switch s.state {
-		case outside:
-			matches := failRE.FindStringSubmatch(line)
-			if matches != nil {
-				eg.Name = matches[1]
-				s.state = inside
-			}
-		case inside:
-			if gotRE.MatchString(line) {
-				s.state = insideGot
-			} else {
-				// The very next line _has_ to be "got:", or something must be wrong...
-				return eg, fmt.Errorf("line should be got!!!!\n%s", line)
-			}
-		case insideGot:
-			if wantRE.MatchString(line) {
-				s.state = insideWant
-				continue
-			}
-			eg.Got += line + "\n"
-		case insideWant:
-			// NOTE: This requires `go test -v`, so that it's printed out before each test:
-			if runRE.MatchString(line) || line == "FAIL" {
-				return eg, nil
-			}
-			eg.Want += line + "\n"
-		}
-	}
-
-	err := s.scanner.Err()
-	if err != nil {
-		return eg, err
-	}
-
-	if len(eg.Got) > 0 || len(eg.Want) > 0 {
-		return eg, nil
-	}
-
-	return eg, EOF
-}
-
-var EOF = errors.New("EOF")
 
 func (e Example) String() string {
 	return fmt.Sprintf(`Example{
