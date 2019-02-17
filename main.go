@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	"log"
@@ -50,11 +51,25 @@ func ScanTestOutputs(data []byte, atEOF bool) (advance int, token []byte, err er
 		return end, between, nil
 	}
 	if len(matches) == 1 && atEOF {
-		// Return everything after the header:
-		return len(data), data[start : len(data)-1], nil
-		// FIXME: Skip the last two lines of output, they show the status
+		// Return everything after the header, but throw out the last two lines
+		// of output because they show the status:
+		advance, token := trimLastNLines(data[start:], 2)
+		return advance, token, nil
 	}
 	return 0, nil, nil
+}
+
+func trimLastNLines(data []byte, n int) (advance int, token []byte) {
+	advance = len(data)
+	for i := 0; advance > 0 && i < n; i++ {
+		lastIndex := bytes.LastIndex(data[0:advance-1], []byte("\n"))
+		if lastIndex < 0 {
+			advance = 0
+			break
+		}
+		advance = lastIndex + 1
+	}
+	return advance, data[:advance]
 }
 
 // Example is the parsed the output of a failing example.
