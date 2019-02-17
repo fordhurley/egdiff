@@ -2,7 +2,7 @@ package main
 
 import "fmt"
 
-func Example_meta() {
+func Example_tricky() {
 	fmt.Println("this is the output")
 	fmt.Println("with tricky stuff mixed in")
 	fmt.Println("got:")

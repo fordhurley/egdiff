@@ -23,8 +23,14 @@ want:
 "a\nb/nc"
 "a\nb\nc"
 "abc"
-=== RUN   Example_meta
---- FAIL: Example_meta (0.00s)
+=== RUN   Example_simple
+--- FAIL: Example_simple (0.00s)
+got:
+this is not it
+want:
+this is it
+=== RUN   Example_tricky
+--- FAIL: Example_tricky (0.00s)
 got:
 this is the output
 with tricky stuff mixed in
@@ -58,7 +64,13 @@ want:
 "a\nb\nc"
 "abc"
 `,
-	`--- FAIL: Example_meta (0.00s)
+	`--- FAIL: Example_simple (0.00s)
+got:
+this is not it
+want:
+this is it
+`,
+	`--- FAIL: Example_tricky (0.00s)
 got:
 this is the output
 with tricky stuff mixed in
@@ -89,7 +101,12 @@ var expectedExamples = []Example{
 "abc"`,
 	},
 	{
-		Name: "Example_meta",
+		Name: "Example_simple",
+		Got:  "this is not it",
+		Want: "this is it",
+	},
+	{
+		Name: "Example_tricky",
 		Got: `
 this is the output
 with tricky stuff mixed in
@@ -119,7 +136,8 @@ func Example_runHeaderRE() {
 	// === RUN   Test_sayHi
 	// === RUN   Example_sayHi
 	// === RUN   Example_replaceLineEndings
-	// === RUN   Example_meta
+	// === RUN   Example_simple
+	// === RUN   Example_tricky
 }
 
 func TestScanTestOutputs(t *testing.T) {
